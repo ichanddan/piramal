@@ -13,7 +13,11 @@ const app = express();
 const port = process.env.PORT;
 
 
-app.use(cors())
+app.use(cors({
+    origin: ['http://localhost:4200','https://piramal.adroitvaluation.in'], 
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH']
+}))
 getConnectionAsync()
 app.use(express.json())
 
