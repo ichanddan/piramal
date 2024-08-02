@@ -267,4 +267,70 @@ const resend_otp = async (req, res) => {
   }
 };
 
-export { signup, login, verifyOTP, resend_otp };
+const forgetPassword = async (req, res) =>{
+  try {
+    const {email} = req.body
+    const pool = await getConnectionAsync()
+    const ForgetQuryy = `select * FROM ADR_VAL_Users where Email_Id=@email`
+    const result = await pool.request().input("email", sql.VarChar(255), email).query(ForgetQuryy)
+    console.log(result)
+    const user = result.recordset[0];
+    (await transporter()).sendMail({
+      to: `${email}`,
+      subject: `ADROIT - Login Details`,
+      html: `Dear ${user.Display_Name} ,<br/><br/>We warmly welcome you to the family of ADROIT and thank you for choosing to login with ADROIT Technical.<br/>For login you will use your mobile number with below password.<br/><h1>" ${user.EmailOTP} "</h1><br/><br/>Thanks and Regard...<br/>Team ADROIT"`,
+    });
+
+    res.status(200).json({message:"otp send" , data:result.recordset[0].Email_Id})
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({message:"internal server problem"}) 
+  }
+}
+
+const changePassword = async (req, res) => {
+  try {
+    const { email, emailOTP, NewPassword } = req.body;
+    const pool = await getConnectionAsync();
+
+    const ForgetQuery = `SELECT * FROM ADR_VAL_Users WHERE Email_Id = @email`;
+    const findUser = await pool
+      .request()
+      .input("email", sql.VarChar(255), email)
+      .query(ForgetQuery);
+    
+    const user = findUser.recordset[0];
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Ensure that user.EmailOTP is correctly compared
+    if (user.EmailOTP === emailOTP) {
+      const updatePassword = `
+        UPDATE ADR_VAL_Users
+        SET Password = @NewPassword
+        WHERE Email_Id = @email AND EmailOTP = @emailOTP
+      `;
+      
+      const result = await pool
+        .request()
+        .input("email", sql.VarChar(255), email)
+        .input("emailOTP", sql.Char(4), emailOTP)
+        .input("NewPassword", sql.VarChar(255), NewPassword) // Adjust length as necessary
+        .query(updatePassword);
+      
+      console.log(result.rowsAffected); // .rowsAffected will provide the number of rows affected
+      res.status(200).json({ message: "Password updated successfully" });
+    } else {
+      res.status(400).json({ message: "Invalid OTP" });
+    }
+
+  } catch (error) {
+    console.error(error); // Use console.error for errors
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+
+export { signup, login, verifyOTP, resend_otp, forgetPassword ,changePassword };
