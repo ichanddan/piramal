@@ -270,18 +270,19 @@ const resend_otp = async (req, res) => {
 const forgetPassword = async (req, res) =>{
   try {
     const {email} = req.body
+    if(!email) return res.status(400).json({message:"Email is required"})
     const pool = await getConnectionAsync()
-    const ForgetQuryy = `select * FROM ADR_VAL_Users where Email_Id=@email`
+    const ForgetQuryy = `EXEC [dbo].[FTvForgetPassword] @Email_Id = @email, @Action = 'G'`
     const result = await pool.request().input("email", sql.VarChar(255), email).query(ForgetQuryy)
-    console.log(result)
     const user = result.recordset[0];
+    console.log(user);
     (await transporter()).sendMail({
       to: `${email}`,
       subject: `ADROIT - Login Details`,
-      html: `Dear ${user.Display_Name} ,<br/><br/>We warmly welcome you to the family of ADROIT and thank you for choosing to login with ADROIT Technical.<br/>For login you will use your mobile number with below password.<br/><h1>" ${user.EmailOTP} "</h1><br/><br/>Thanks and Regard...<br/>Team ADROIT"`,
+      html: `Dear ${user.UserName} ,<br/><br/>We warmly welcome you to the family of ADROIT and thank you for choosing to login with ADROIT Technical.<br/>For login you will use your mobile number with below password.<br/><h1>" ${user.GeneratedOTP} "</h1><br/><br/>Thanks and Regard...<br/>Team ADROIT"`,
     });
 
-    res.status(200).json({message:"otp send" , data:result.recordset[0].Email_Id})
+    res.status(200).json({message:user.Message, email });
   } catch (error) {
     console.log(error)
     res.status(500).json({message:"internal server problem"}) 
@@ -290,42 +291,27 @@ const forgetPassword = async (req, res) =>{
 
 const changePassword = async (req, res) => {
   try {
-    const { email, emailOTP, NewPassword } = req.body;
+    const { email, UserOTP, NewPassword } = req.body;
+    if(!email) return res.status(400).json({message:"Email is required"})
+    if(!UserOTP) return res.status(400).json({message:"Email is required"})
+    if(!NewPassword) return res.status(400).json({message:"Email is required"})
     const pool = await getConnectionAsync();
+    const updatePassword = `EXEC [dbo].[FTvForgetPassword]
+      @Email_Id = @email,
+      @Action = 'U',
+      @UserOTP = @UserOTP,
+      @NewPassword = @NewPassword
+      `;
 
-    const ForgetQuery = `SELECT * FROM ADR_VAL_Users WHERE Email_Id = @email`;
-    const findUser = await pool
+    const result = await pool
       .request()
       .input("email", sql.VarChar(255), email)
-      .query(ForgetQuery);
-    
-    const user = findUser.recordset[0];
-    
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+      .input("UserOTP", sql.VarChar(4), UserOTP)
+      .input("NewPassword", sql.VarChar(255), NewPassword)
+      .query(updatePassword);
 
-    // Ensure that user.EmailOTP is correctly compared
-    if (user.EmailOTP === emailOTP) {
-      const updatePassword = `
-        UPDATE ADR_VAL_Users
-        SET Password = @NewPassword
-        WHERE Email_Id = @email AND EmailOTP = @emailOTP
-      `;
-      
-      const result = await pool
-        .request()
-        .input("email", sql.VarChar(255), email)
-        .input("emailOTP", sql.Char(4), emailOTP)
-        .input("NewPassword", sql.VarChar(255), NewPassword) // Adjust length as necessary
-        .query(updatePassword);
-      
-      console.log(result.rowsAffected); // .rowsAffected will provide the number of rows affected
-      res.status(200).json({ message: "Password updated successfully" });
-    } else {
-      res.status(400).json({ message: "Invalid OTP" });
-    }
-
+    console.log(result.recordset); 
+    res.status(result.recordset[0].Status).json(result.recordset[0] );
   } catch (error) {
     console.error(error); // Use console.error for errors
     res.status(500).json({ message: "Internal server error" });
