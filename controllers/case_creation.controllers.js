@@ -229,7 +229,34 @@ const getCase_d_by_case_id = async (req, res) => {
     res.status(500).json({ message: "Internal server problem", error });
   }
 };
+const DocumentUpdate = async (req, res) => {
+  try {
+    const { Case_id, Doc_id } = req.body;
+    if (!Case_id)
+      return res.status(400).json({ message: "Case id is requred" });
+    if (!Doc_id) return res.status(400).json({ message: "Case id is requred" });
+
+    const pool = await getConnectionAsync();
+    if (!pool) return res.status(500).json({ message: "Db error" });
+
+    const update_Doc = `EXEC Ftv_UpdateDocument @Case_ID = @Case_id, @Documents = @Doc_id`;
+    const result = await pool
+      .request()
+      .input("Case_id", sql.Int, Case_id)
+      .input("Doc_id", sql.VarChar(500), Doc_id)
+      .query(update_Doc);
+
+    console.log(result)
+    if (result) {
+      res
+        .status(200)
+        .json({ message: "Document updated successfully" });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Internal server problem", error });
+  }
+};
 
 
-
-export { caseCreationUpload, caseCreation, caseDocument,getCase_List_By_id, getCase_d_by_case_id };
+export { caseCreationUpload, caseCreation, caseDocument,getCase_List_By_id, getCase_d_by_case_id , DocumentUpdate };
